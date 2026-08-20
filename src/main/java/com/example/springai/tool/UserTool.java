@@ -1,8 +1,8 @@
 package com.example.springai.tool;
 
 import java.math.BigDecimal;
-import java.util.Map;
 
+import com.example.springai.dto.UserAcademicInfoDto;
 import com.example.springai.entity.User;
 import com.example.springai.repository.UserRepository;
 import org.springframework.ai.chat.model.ToolContext;
@@ -22,12 +22,12 @@ public class UserTool {
     }
 
     @Tool(name = "getUserAcademicInfo", description = "Get the current user's academic information.")
-    public UserAcademicInfo getUserAcademicInfo(
+    public UserAcademicInfoDto getUserAcademicInfo(
             @ToolParam(required = false, description = "Requested user id. Omit this when asking for the current user.") Long requestedUserId,
             ToolContext toolContext) {
-        User user = findUser(toolContext, requestedUserId);
+        User user = findCurrentUser(toolContext, requestedUserId);
 
-        return new UserAcademicInfo(
+        return new UserAcademicInfoDto(
                 user.getId(),
                 user.getGpa(),
                 user.getGrade(),
@@ -39,38 +39,40 @@ public class UserTool {
     public BigDecimal getUserGpa(
             @ToolParam(required = false, description = "Requested user id. Omit this when asking for the current user.") Long requestedUserId,
             ToolContext toolContext) {
-        return findUser(toolContext, requestedUserId).getGpa();
+        return findCurrentUser(toolContext, requestedUserId).getGpa();
     }
 
     @Tool(name = "getUserGrade", description = "Get the current user's grade.")
     public BigDecimal getUserGrade(
             @ToolParam(required = false, description = "Requested user id. Omit this when asking for the current user.") Long requestedUserId,
             ToolContext toolContext) {
-        return findUser(toolContext, requestedUserId).getGrade();
+        return findCurrentUser(toolContext, requestedUserId).getGrade();
     }
 
     @Tool(name = "getUserGeneralEducationCredits", description = "Get the current user's general education credits.")
     public Integer getUserGeneralEducationCredits(
             @ToolParam(required = false, description = "Requested user id. Omit this when asking for the current user.") Long requestedUserId,
             ToolContext toolContext) {
-        return findUser(toolContext, requestedUserId).getGeneralEducationCredits();
+        return findCurrentUser(toolContext, requestedUserId).getGeneralEducationCredits();
     }
 
     @Tool(name = "getUserMajorCredits", description = "Get the current user's major credits.")
     public Integer getUserMajorCredits(
             @ToolParam(required = false, description = "Requested user id. Omit this when asking for the current user.") Long requestedUserId,
             ToolContext toolContext) {
-        return findUser(toolContext, requestedUserId).getMajorCredits();
+        return findCurrentUser(toolContext, requestedUserId).getMajorCredits();
     }
 
-    private User findUser(ToolContext toolContext, Long requestedUserId) {
+    private User findCurrentUser(ToolContext toolContext, Long requestedUserId) {
         Long currentUserId = resolveUserId(toolContext);
-        validateUserAccess(currentUserId, requestedUserId);
+        if (requestedUserId != null && !requestedUserId.equals(currentUserId)) {
+            throw new UserDataAccessDeniedException(currentUserId, requestedUserId);
+        }
 
-        return findUser(currentUserId);
+        return findUserById(currentUserId);
     }
 
-    private User findUser(Long userId) {
+    private User findUserById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found. userId=" + userId));
     }
@@ -80,35 +82,11 @@ public class UserTool {
             throw new IllegalArgumentException("Tool context is required.");
         }
 
-        Map<String, Object> context = toolContext.getContext();
-        Object userId = context.get(USER_ID_CONTEXT_KEY);
-
+        Object userId = toolContext.getContext().get(USER_ID_CONTEXT_KEY);
         if (userId instanceof Long value) {
             return value;
         }
 
-        if (userId instanceof Number value) {
-            return value.longValue();
-        }
-
-        if (userId instanceof String value && !value.isBlank()) {
-            return Long.parseLong(value);
-        }
-
-        throw new IllegalArgumentException("Tool context must contain userId.");
-    }
-
-    private void validateUserAccess(Long currentUserId, Long requestedUserId) {
-        if (requestedUserId != null && !requestedUserId.equals(currentUserId)) {
-            throw new UserDataAccessDeniedException(currentUserId, requestedUserId);
-        }
-    }
-
-    public record UserAcademicInfo(
-            Long id,
-            BigDecimal gpa,
-            BigDecimal grade,
-            Integer generalEducationCredits,
-            Integer majorCredits) {
+        throw new IllegalArgumentException("Tool context must contain Long userId.");
     }
 }
