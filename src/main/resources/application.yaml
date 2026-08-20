@@ -1,0 +1,39 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+
+  application:
+    name: springai
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/springai}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: ${OPENAI_CHAT_MODEL:gpt-4.1-mini}
+      embedding:
+        options:
+          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        schema-name: public
+        table-name: vector_store
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        remove-existing-vector-store-table: false
