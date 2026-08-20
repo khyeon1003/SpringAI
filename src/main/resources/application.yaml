@@ -25,6 +25,8 @@ spring:
       chat:
         options:
           model: ${OPENAI_CHAT_MODEL:gpt-4.1-mini}
+          temperature: ${OPENAI_CHAT_TEMPERATURE:0.2}
+          max-tokens: ${OPENAI_CHAT_MAX_TOKENS:1024}
       embedding:
         options:
           model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
