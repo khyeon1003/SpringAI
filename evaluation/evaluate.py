@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 from ragas.llms import llm_factory
 from ragas.metrics.collections import Faithfulness, FactualCorrectness
 
@@ -69,7 +69,8 @@ def main() -> int:
     with GOLDEN_SET_PATH.open(encoding="utf-8") as file:
         cases = json.load(file)["cases"]
 
-    client = OpenAI()
+    # ragas 0.4.x 의 metric.score() 는 내부적으로 agenerate() 를 호출하므로 비동기 클라이언트가 필요하다.
+    client = AsyncOpenAI()
     evaluator_llm = llm_factory(EVALUATOR_MODEL, client=client)
     faithfulness = Faithfulness(llm=evaluator_llm)
     factual_correctness = FactualCorrectness(llm=evaluator_llm, mode="f1")
