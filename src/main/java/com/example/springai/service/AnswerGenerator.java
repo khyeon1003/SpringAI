@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.example.springai.metrics.TokenUsageMetrics;
 import com.example.springai.tool.UserTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
@@ -19,10 +20,12 @@ public class AnswerGenerator {
     private static final Resource USER_PROMPT = new ClassPathResource("prompts/rag-user.st");
     private final ChatClient chatClient;
     private final UserTool userTool;
+    private final TokenUsageMetrics tokenUsageMetrics;
 
-    public AnswerGenerator(ChatClient chatClient, UserTool userTool) {
+    public AnswerGenerator(ChatClient chatClient, UserTool userTool, TokenUsageMetrics tokenUsageMetrics) {
         this.chatClient = chatClient;
         this.userTool = userTool;
+        this.tokenUsageMetrics = tokenUsageMetrics;
     }
 
     public String generate(String query, List<Document> retrievedChunks, Long userId) {
@@ -32,7 +35,7 @@ public class AnswerGenerator {
 
         String context = toContext(retrievedChunks);
 
-        return chatClient.prompt()
+        var chatResponse = chatClient.prompt()
                 .system(SYSTEM_PROMPT)
                 .user(user -> user.text(USER_PROMPT)
                         .param("context", context)
@@ -40,7 +43,13 @@ public class AnswerGenerator {
                 .tools(userTool)
                 .toolContext(toToolContext(userId))
                 .call()
-                .content();
+                .chatResponse();
+
+        if (chatResponse == null) {
+            throw new IllegalStateException("Chat model returned no response.");
+        }
+        tokenUsageMetrics.record(chatResponse.getMetadata().getUsage());
+        return chatResponse.getResult().getOutput().getText();
     }
 
     private Map<String, Object> toToolContext(Long userId) {

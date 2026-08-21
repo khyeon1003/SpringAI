@@ -43,3 +43,12 @@ spring:
 app:
   rag:
     top-k: ${RAG_TOP_K:4}
+  metrics:
+    token-usage:
+      average-limit: ${TOKEN_USAGE_AVERAGE_LIMIT:2000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus

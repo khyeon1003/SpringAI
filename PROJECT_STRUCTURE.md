@@ -168,6 +168,7 @@ erDiagram
 | `OPENAI_CHAT_MODEL` | 채팅 모델 | `gpt-4.1-mini` |
 | `OPENAI_EMBEDDING_MODEL` | 임베딩 모델 | `text-embedding-3-small` |
 | `RAG_TOP_K` | 질문마다 검색할 유사 문서 개수 | `4` |
+| `TOKEN_USAGE_AVERAGE_LIMIT` | 질의당 평균 total token 상한 | `2000` |
 
 새 환경에서는 `.env.example`을 복사한 뒤 실제 접속 정보와 OpenAI API 키를 입력한다.
 
