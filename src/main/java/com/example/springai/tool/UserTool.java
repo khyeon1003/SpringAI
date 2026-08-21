@@ -1,6 +1,7 @@
 package com.example.springai.tool;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 
 import com.example.springai.dto.UserAcademicInfoDto;
 import com.example.springai.entity.User;
@@ -15,6 +16,9 @@ public class UserTool {
 
     public static final String USER_ID_CONTEXT_KEY = "userId";
 
+    /** 호출된 도구 이름을 담는 수집기. 응답에서 도구 사용 여부를 드러내기 위해 서버가 넣어 준다. */
+    public static final String TOOL_CALLS_CONTEXT_KEY = "toolCalls";
+
     private final UserRepository userRepository;
 
     public UserTool(UserRepository userRepository) {
@@ -25,6 +29,7 @@ public class UserTool {
     public UserAcademicInfoDto getUserAcademicInfo(
             @ToolParam(required = false, description = "Requested user id. Omit this when asking for the current user.") Long requestedUserId,
             ToolContext toolContext) {
+        record(toolContext, "getUserAcademicInfo");
         User user = findCurrentUser(toolContext, requestedUserId);
 
         return new UserAcademicInfoDto(
@@ -39,6 +44,7 @@ public class UserTool {
     public BigDecimal getUserGpa(
             @ToolParam(required = false, description = "Requested user id. Omit this when asking for the current user.") Long requestedUserId,
             ToolContext toolContext) {
+        record(toolContext, "getUserGpa");
         return findCurrentUser(toolContext, requestedUserId).getGpa();
     }
 
@@ -46,6 +52,7 @@ public class UserTool {
     public BigDecimal getUserGrade(
             @ToolParam(required = false, description = "Requested user id. Omit this when asking for the current user.") Long requestedUserId,
             ToolContext toolContext) {
+        record(toolContext, "getUserGrade");
         return findCurrentUser(toolContext, requestedUserId).getGrade();
     }
 
@@ -53,6 +60,7 @@ public class UserTool {
     public Integer getUserGeneralEducationCredits(
             @ToolParam(required = false, description = "Requested user id. Omit this when asking for the current user.") Long requestedUserId,
             ToolContext toolContext) {
+        record(toolContext, "getUserGeneralEducationCredits");
         return findCurrentUser(toolContext, requestedUserId).getGeneralEducationCredits();
     }
 
@@ -60,7 +68,20 @@ public class UserTool {
     public Integer getUserMajorCredits(
             @ToolParam(required = false, description = "Requested user id. Omit this when asking for the current user.") Long requestedUserId,
             ToolContext toolContext) {
+        record(toolContext, "getUserMajorCredits");
         return findCurrentUser(toolContext, requestedUserId).getMajorCredits();
+    }
+
+    /** 어떤 도구가 실제로 불렸는지 남긴다. 수집기가 없으면 조용히 넘어간다. */
+    @SuppressWarnings("unchecked")
+    private void record(ToolContext toolContext, String toolName) {
+        if (toolContext == null) {
+            return;
+        }
+        Object collector = toolContext.getContext().get(TOOL_CALLS_CONTEXT_KEY);
+        if (collector instanceof Collection) {
+            ((Collection<String>) collector).add(toolName);
+        }
     }
 
     private User findCurrentUser(ToolContext toolContext, Long requestedUserId) {

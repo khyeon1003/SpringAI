@@ -38,15 +38,15 @@ public class Service {
         catch (GuardrailBlockedException exception) {
             // 가드레일이 막은 요청은 검색도 Tool 호출도 하지 않는다.
             log.info("가드레일 차단 - query=[{}] 사유=[{}]", query, exception.getMessage());
-            return new ChatResponse(ChatAction.BLOCK, exception.getMessage(), List.of(), List.of());
+            return ChatResponse.blocked(exception.getMessage());
         }
 
         var retrievedChunks = retriever.retrieveChunks(searchQuery);
 
-        String answer;
+        AnswerGenerator.GeneratedAnswer generated;
         try {
             // 검색은 재작성된 질문으로, 답변은 사용자가 실제로 물어본 원문으로 만든다.
-            answer = answerGenerator.generate(query, retrievedChunks, userId, conversationId);
+            generated = answerGenerator.generate(query, retrievedChunks, userId, conversationId);
         }
         catch (RuntimeException exception) {
             // 가드레일을 통과한 요청이라도 도구가 소유자 검증에서 막을 수 있다. 마지막 방어선이므로
@@ -55,7 +55,7 @@ public class Service {
                 throw exception;
             }
             log.info("도구 소유자 검증 차단 - query=[{}]", query);
-            return new ChatResponse(ChatAction.BLOCK, USER_DATA_ACCESS_DENIED, List.of(), List.of());
+            return ChatResponse.blocked(USER_DATA_ACCESS_DENIED);
         }
 
         List<String> contexts = retrievedChunks.stream()
@@ -63,7 +63,10 @@ public class Service {
                 .toList();
         List<Source> sources = Sources.from(retrievedChunks);
 
-        return new ChatResponse(ChatAction.ANSWER, answer, contexts, sources);
+        ChatResponse response = ChatResponse.answered(
+                generated.text(), generated.toolCalls(), contexts, sources);
+        log.info("응답 - route={} 근거={}건 도구={}", response.route(), contexts.size(), generated.toolCalls());
+        return response;
     }
 
     /** 도구에서 던진 예외는 모델 호출 과정을 거치며 감싸여 올라오므로 원인 사슬을 따라간다. */

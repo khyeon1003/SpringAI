@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
@@ -31,10 +32,16 @@ public class Controller {
         this.service = service;
     }
 
+    /**
+     * @param includeContexts 근거 청크 본문을 응답에 담을지. RAGAS 평가가 이 값을 쓰므로 기본은 담는다.
+     *                        눈으로 확인할 때는 {@code ?contexts=false} 로 끄면 응답이 짧아진다.
+     */
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ChatResponse chat(@RequestBody ChatRequest request) {
+    public ChatResponse chat(@RequestBody ChatRequest request,
+            @RequestParam(name = "contexts", defaultValue = "true") boolean includeContexts) {
         validate(request);
-        return service.answer(request.userId(), request.sessionId(), request.message());
+        ChatResponse response = service.answer(request.userId(), request.sessionId(), request.message());
+        return includeContexts ? response : response.withoutContexts();
     }
 
     @PostMapping(

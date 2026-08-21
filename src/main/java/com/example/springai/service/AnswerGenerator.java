@@ -1,7 +1,9 @@
 package com.example.springai.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.example.springai.metrics.TokenUsageMetrics;
 import com.example.springai.tool.UserTool;
@@ -41,12 +43,15 @@ public class AnswerGenerator {
      *                       개인화 단서와 지시어를 보존해야 Tool 호출과 맥락 유지가 정상 동작한다.
      * @param conversationId 대화 식별자. {@code null}이면 이력 없이 이번 질문만으로 답한다.
      */
-    public String generate(String query, List<Document> retrievedChunks, Long userId, String conversationId) {
+    public GeneratedAnswer generate(String query, List<Document> retrievedChunks, Long userId,
+            String conversationId) {
         if (!StringUtils.hasText(query)) {
             throw new IllegalArgumentException("query must not be blank");
         }
 
-        var chatResponse = promptFor(query, retrievedChunks, userId, conversationId)
+        List<String> toolCalls = new CopyOnWriteArrayList<>();
+
+        var chatResponse = promptFor(query, retrievedChunks, userId, conversationId, toolCalls)
                 .call()
                 .chatResponse();
 
@@ -58,7 +63,15 @@ public class AnswerGenerator {
 
         String answer = chatResponse.getResult().getOutput().getText();
         remember(conversationId, query, answer);
-        return answer;
+        return new GeneratedAnswer(answer, new ArrayList<>(toolCalls));
+    }
+
+    /**
+     * 답변과 그 과정에서 호출된 도구.
+     *
+     * <p>도구를 실제로 썼는지는 응답 본문만 봐서는 알 수 없다. 검증할 수 있도록 함께 돌려준다.
+     */
+    public record GeneratedAnswer(String text, List<String> toolCalls) {
     }
 
     /**
@@ -71,7 +84,7 @@ public class AnswerGenerator {
         }
 
         StringBuilder collected = new StringBuilder();
-        return promptFor(query, retrievedChunks, userId, conversationId)
+        return promptFor(query, retrievedChunks, userId, conversationId, new CopyOnWriteArrayList<>())
                 .stream()
                 .chatResponse()
                 .doOnNext(response -> {
@@ -89,7 +102,7 @@ public class AnswerGenerator {
     }
 
     private ChatClient.ChatClientRequestSpec promptFor(String query, List<Document> retrievedChunks,
-            Long userId, String conversationId) {
+            Long userId, String conversationId, List<String> toolCalls) {
         String context = toContext(retrievedChunks);
 
         var prompt = chatClient.prompt()
@@ -102,7 +115,7 @@ public class AnswerGenerator {
         // 현재 사용자를 특정할 수 없으면 개인 학사정보 도구를 아예 노출하지 않는다.
         // 빈 ToolContext 로 도구만 붙여 두면 모델이 호출했을 때 요청 자체가 실패한다.
         if (userId != null) {
-            prompt = prompt.tools(userTool).toolContext(toToolContext(userId));
+            prompt = prompt.tools(userTool).toolContext(toToolContext(userId, toolCalls));
         }
         return prompt;
     }
@@ -130,8 +143,10 @@ public class AnswerGenerator {
         chatMemory.add(conversationId, List.of(new UserMessage(query), new AssistantMessage(answer)));
     }
 
-    private Map<String, Object> toToolContext(Long userId) {
-        return Map.of(UserTool.USER_ID_CONTEXT_KEY, userId);
+    private Map<String, Object> toToolContext(Long userId, List<String> toolCalls) {
+        return Map.of(
+                UserTool.USER_ID_CONTEXT_KEY, userId,
+                UserTool.TOOL_CALLS_CONTEXT_KEY, toolCalls);
     }
 
     /** 청크마다 출처 라벨을 붙여, 모델이 어떤 규정을 근거로 삼았는지 답변에서 지목할 수 있게 한다. */
