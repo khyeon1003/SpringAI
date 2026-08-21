@@ -56,3 +56,12 @@ app:
     memory:
       # 대화 윈도우 크기. 사용자와 어시스턴트 메시지를 합한 개수다.
       max-messages: ${CHAT_MEMORY_MAX_MESSAGES:20}
+  metrics:
+    token-usage:
+      average-limit: ${TOKEN_USAGE_AVERAGE_LIMIT:2000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus

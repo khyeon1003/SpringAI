@@ -46,3 +46,19 @@ k6 run k6/chatbot-load-test.js
 
 기본 성공 기준은 오류율 1% 미만, p95 3초 미만, p99 5초 미만이다. LLM 응답 시간이
 긴 API라면 실제 서비스 목표에 맞춰 `thresholds`를 조정한다.
+
+## localhost GET 부하 테스트
+
+기본적으로 `GET http://localhost:8080/actuator/health`를 테스트한다.
+
+```bash
+k6 run k6/get-load-test.js
+```
+
+다른 GET 경로를 테스트하려면 다음과 같이 실행한다.
+
+```bash
+GET_PATH=/api/example VUS=30 HOLD=1m k6 run k6/get-load-test.js
+```
+
+기본 기준은 오류율 1% 미만, p95 500ms 미만, p99 1초 미만이다.

@@ -251,6 +251,7 @@ erDiagram
 | `RAG_TOP_K` | 질문마다 검색할 유사 문서 개수 | `4` |
 | `RAG_SIMILARITY_THRESHOLD` | 검색 결과로 인정할 코사인 유사도 하한 | `0.54` |
 | `CHAT_MEMORY_MAX_MESSAGES` | 대화 메모리에 유지할 최근 메시지 수 | `20` |
+| `TOKEN_USAGE_AVERAGE_LIMIT` | 질의당 평균 total token 상한 | `2000` |
 
 새 환경에서는 `.env.example`을 복사한 뒤 실제 접속 정보와 OpenAI API 키를 입력한다.
 
@@ -260,7 +261,8 @@ erDiagram
 ## 8. 요청 처리 흐름
 
 ```text
-POST /api/v1/chat  { message, userId?, sessionId? }
+POST /api/v1/chat         { message, userId?, sessionId? }   # 동기 JSON
+POST /api/v1/chat/stream  { message, userId?, sessionId? }   # SSE
 → QueryRewriter + GuardrailAdvisor      # LLM 1회. 가드레일 주입 후 재작성
    ├─ [[BLOCK]] : action=BLOCK 즉시 반환, 검색과 Tool 호출 생략
    └─ 통과      : 검색용으로 재작성된 질문
@@ -287,6 +289,34 @@ POST /api/v1/chat  { message, userId?, sessionId? }
 | `sources` | 각 청크의 출처. `contexts`와 순서가 대응한다 |
 
 `sources`는 모델에게 **전달한** 근거 전체이고, 답변 마지막 줄의 `출처:`는 모델이 **인용한** 것만이다.
+
+### 스트리밍
+
+`POST /api/v1/chat/stream`은 같은 파이프라인을 지나며 전달 방식만 다르다. 가드레일과 질문 재작성,
+대화 이력이 동일하게 적용된다. 스트리밍만 우회 경로가 되면 차단이 무의미해지기 때문이다.
+
+| 이벤트 | 의미 |
+|---|---|
+| `connected` | 스트림 시작 |
+| `token` | 답변 조각 |
+| `block` | 가드레일 차단. 동기 응답의 `action=BLOCK`에 대응하며 토큰은 오지 않는다 |
+| `completed` | 스트림 종료 |
+| `error` | 생성 중 오류 |
+
+답변 전체는 스트림이 끝나야 완성되므로 대화 기록도 그 시점에 저장한다.
+
+### 토큰 계측
+
+`TokenUsageMetrics`가 응답 메타데이터의 `Usage`를 Micrometer에 기록한다. 동기와 스트리밍 모두 대상이다.
+
+| 지표 | 의미 |
+|---|---|
+| `chat.query.tokens` | 질의당 총 토큰 분포 |
+| `chat.query.tokens.average` | 질의당 평균 토큰 |
+| `chat.query.tokens.average.limit` | 설정된 상한(`TOKEN_USAGE_AVERAGE_LIMIT`) |
+| `chat.query.tokens.average.compliant` | 평균이 상한 이내면 1, 아니면 0 |
+
+`/actuator/metrics`와 `/actuator/prometheus`로 노출된다.
 
 ## 9. 멀티턴 대화
 

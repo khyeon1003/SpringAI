@@ -3,6 +3,7 @@ package com.example.springai.service;
 import java.util.List;
 import java.util.Map;
 
+import com.example.springai.metrics.TokenUsageMetrics;
 import com.example.springai.tool.UserTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -14,6 +15,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Flux;
 
 @Component
 public class AnswerGenerator {
@@ -24,11 +26,14 @@ public class AnswerGenerator {
     private final ChatClient chatClient;
     private final UserTool userTool;
     private final ChatMemory chatMemory;
+    private final TokenUsageMetrics tokenUsageMetrics;
 
-    public AnswerGenerator(ChatClient chatClient, UserTool userTool, ChatMemory chatMemory) {
+    public AnswerGenerator(ChatClient chatClient, UserTool userTool, ChatMemory chatMemory,
+            TokenUsageMetrics tokenUsageMetrics) {
         this.chatClient = chatClient;
         this.userTool = userTool;
         this.chatMemory = chatMemory;
+        this.tokenUsageMetrics = tokenUsageMetrics;
     }
 
     /**
@@ -41,12 +46,55 @@ public class AnswerGenerator {
             throw new IllegalArgumentException("query must not be blank");
         }
 
+        var chatResponse = promptFor(query, retrievedChunks, userId, conversationId)
+                .call()
+                .chatResponse();
+
+        if (chatResponse == null) {
+            throw new IllegalStateException("Chat model returned no response.");
+        }
+
+        tokenUsageMetrics.record(chatResponse.getMetadata().getUsage());
+
+        String answer = chatResponse.getResult().getOutput().getText();
+        remember(conversationId, query, answer);
+        return answer;
+    }
+
+    /**
+     * 토큰 단위로 답변을 흘려보낸다. 동기 응답과 같은 프롬프트, 같은 도구, 같은 대화 이력을 쓴다.
+     * 스트리밍은 전달 방식일 뿐이므로 파이프라인이 갈라지면 안 된다.
+     */
+    public Flux<String> stream(String query, List<Document> retrievedChunks, Long userId, String conversationId) {
+        if (!StringUtils.hasText(query)) {
+            return Flux.error(new IllegalArgumentException("query must not be blank"));
+        }
+
+        StringBuilder collected = new StringBuilder();
+        return promptFor(query, retrievedChunks, userId, conversationId)
+                .stream()
+                .chatResponse()
+                .doOnNext(response -> {
+                    if (response.getMetadata() != null) {
+                        tokenUsageMetrics.record(response.getMetadata().getUsage());
+                    }
+                })
+                .mapNotNull(response -> response.getResult() == null
+                        ? null
+                        : response.getResult().getOutput().getText())
+                .filter(StringUtils::hasText)
+                .doOnNext(collected::append)
+                // 스트림이 끝난 뒤에야 답변 전체가 완성되므로 여기서 기록한다.
+                .doOnComplete(() -> remember(conversationId, query, collected.toString()));
+    }
+
+    private ChatClient.ChatClientRequestSpec promptFor(String query, List<Document> retrievedChunks,
+            Long userId, String conversationId) {
         String context = toContext(retrievedChunks);
-        List<Message> history = history(conversationId);
 
         var prompt = chatClient.prompt()
                 .system(SYSTEM_PROMPT)
-                .messages(history)
+                .messages(history(conversationId))
                 .user(user -> user.text(USER_PROMPT)
                         .param("context", context)
                         .param("query", query));
@@ -56,10 +104,7 @@ public class AnswerGenerator {
         if (userId != null) {
             prompt = prompt.tools(userTool).toolContext(toToolContext(userId));
         }
-
-        String answer = prompt.call().content();
-        remember(conversationId, query, answer);
-        return answer;
+        return prompt;
     }
 
     private List<Message> history(String conversationId) {

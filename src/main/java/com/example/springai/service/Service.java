@@ -10,6 +10,7 @@ import com.example.springai.tool.UserDataAccessDeniedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
+import reactor.core.publisher.Flux;
 
 @org.springframework.stereotype.Service
 public class Service {
@@ -73,5 +74,22 @@ public class Service {
             }
         }
         return false;
+    }
+
+    /**
+     * 스트리밍 응답. 동기 응답과 같은 경로를 지난다.
+     *
+     * <p>전달 방식만 다를 뿐 가드레일, 질문 재작성, 대화 이력은 동일하게 적용해야 한다.
+     * 여기서 우회하면 스트리밍 엔드포인트가 차단을 통과하는 뒷문이 된다.
+     *
+     * @throws GuardrailBlockedException 가드레일이 요청을 차단한 경우. 호출부가 BLOCK 이벤트로 바꾼다.
+     */
+    public Flux<String> streamAnswer(Long userId, String sessionId, String query) {
+        String conversationId = ConversationIds.of(userId, sessionId);
+
+        String searchQuery = queryRewriter.rewrite(query, conversationId);
+        var retrievedChunks = retriever.retrieveChunks(searchQuery);
+
+        return answerGenerator.stream(query, retrievedChunks, userId, conversationId);
     }
 }
