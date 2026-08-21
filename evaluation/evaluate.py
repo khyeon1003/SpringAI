@@ -27,8 +27,9 @@ MIN_SCORE = float(os.getenv("RAGAS_MIN_SCORE", "0.7"))
 
 def call_chat_api(case: dict[str, Any]) -> dict[str, Any]:
     payload: dict[str, Any] = {"message": case["question"]}
-    if case.get("userContext") is not None:
-        payload["userContext"] = case["userContext"]
+    user_ids = json.loads(os.getenv("CHAT_EVAL_USER_IDS", "{}"))
+    if case["id"] in user_ids:
+        payload["userId"] = user_ids[case["id"]]
 
     request = urllib.request.Request(
         f"{BASE_URL}{CHAT_PATH}",
