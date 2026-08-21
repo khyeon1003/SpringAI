@@ -31,6 +31,12 @@ spring:
         options:
           model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
 
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: always
+
     vectorstore:
       pgvector:
         initialize-schema: true
@@ -43,3 +49,10 @@ spring:
 app:
   rag:
     top-k: ${RAG_TOP_K:4}
+    # 코사인 유사도 하한. chunk-dump/threshold/_report.md 의 실측 분포를 근거로 정했다.
+    # 문서에 답이 있는 질문의 근거 청크는 0.543 이상, 문서에 없는 학사 질문의 최상위 노이즈는 0.530 이하였다.
+    similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.54}
+  chat:
+    memory:
+      # 대화 윈도우 크기. 사용자와 어시스턴트 메시지를 합한 개수다.
+      max-messages: ${CHAT_MEMORY_MAX_MESSAGES:20}

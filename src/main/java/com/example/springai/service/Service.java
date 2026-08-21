@@ -2,27 +2,76 @@ package com.example.springai.service;
 
 import java.util.List;
 
+import com.example.springai.advisor.GuardrailBlockedException;
 import com.example.springai.dto.ChatAction;
 import com.example.springai.dto.ChatResponse;
+import com.example.springai.dto.Source;
+import com.example.springai.tool.UserDataAccessDeniedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 
 @org.springframework.stereotype.Service
 public class Service {
 
+    private static final Logger log = LoggerFactory.getLogger(Service.class);
+    private static final String USER_DATA_ACCESS_DENIED = "다른 사용자의 개인 데이터는 조회할 수 없습니다.";
+
+    private final QueryRewriter queryRewriter;
     private final Retriever retriever;
     private final AnswerGenerator answerGenerator;
 
-    public Service(Retriever retriever, AnswerGenerator answerGenerator) {
+    public Service(QueryRewriter queryRewriter, Retriever retriever, AnswerGenerator answerGenerator) {
+        this.queryRewriter = queryRewriter;
         this.retriever = retriever;
         this.answerGenerator = answerGenerator;
     }
 
-    public ChatResponse answer(Long userId, String query) {
-        var retrievedChunks = retriever.retrieveChunks(query);
-        String answer = answerGenerator.generate(query, retrievedChunks, userId);
+    public ChatResponse answer(Long userId, String sessionId, String query) {
+        String conversationId = ConversationIds.of(userId, sessionId);
+
+        String searchQuery;
+        try {
+            searchQuery = queryRewriter.rewrite(query, conversationId);
+        }
+        catch (GuardrailBlockedException exception) {
+            // 가드레일이 막은 요청은 검색도 Tool 호출도 하지 않는다.
+            log.info("가드레일 차단 - query=[{}] 사유=[{}]", query, exception.getMessage());
+            return new ChatResponse(ChatAction.BLOCK, exception.getMessage(), List.of(), List.of());
+        }
+
+        var retrievedChunks = retriever.retrieveChunks(searchQuery);
+
+        String answer;
+        try {
+            // 검색은 재작성된 질문으로, 답변은 사용자가 실제로 물어본 원문으로 만든다.
+            answer = answerGenerator.generate(query, retrievedChunks, userId, conversationId);
+        }
+        catch (RuntimeException exception) {
+            // 가드레일을 통과한 요청이라도 도구가 소유자 검증에서 막을 수 있다. 마지막 방어선이므로
+            // 오류가 아니라 차단으로 응답한다.
+            if (!isUserDataAccessDenied(exception)) {
+                throw exception;
+            }
+            log.info("도구 소유자 검증 차단 - query=[{}]", query);
+            return new ChatResponse(ChatAction.BLOCK, USER_DATA_ACCESS_DENIED, List.of(), List.of());
+        }
+
         List<String> contexts = retrievedChunks.stream()
                 .map(Document::getText)
                 .toList();
-        return new ChatResponse(ChatAction.ANSWER, answer, contexts);
+        List<Source> sources = Sources.from(retrievedChunks);
+
+        return new ChatResponse(ChatAction.ANSWER, answer, contexts, sources);
+    }
+
+    /** 도구에서 던진 예외는 모델 호출 과정을 거치며 감싸여 올라오므로 원인 사슬을 따라간다. */
+    private boolean isUserDataAccessDenied(Throwable throwable) {
+        for (Throwable current = throwable; current != null; current = current.getCause()) {
+            if (current instanceof UserDataAccessDeniedException) {
+                return true;
+            }
+        }
+        return false;
     }
 }
