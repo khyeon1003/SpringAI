@@ -7,8 +7,6 @@ import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
-import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
-import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -16,23 +14,23 @@ import org.springframework.core.Ordered;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
 
 @Component
-public class GuardrailAdvisor implements CallAdvisor, StreamAdvisor {
+public class GuardrailAdvisor implements CallAdvisor {
 
     private static final Resource GUARDRAIL_PROMPT = new ClassPathResource("prompts/guardrail-system.st");
+    private static final String BLOCK_PREFIX = "[[BLOCK]]";
 
     @Override
     public ChatClientResponse adviseCall(ChatClientRequest chatClientRequest, CallAdvisorChain callAdvisorChain) {
-        return callAdvisorChain.nextCall(applyGuardrail(chatClientRequest));
-    }
-
-    @Override
-    public Flux<ChatClientResponse> adviseStream(
-            ChatClientRequest chatClientRequest,
-            StreamAdvisorChain streamAdvisorChain) {
-        return streamAdvisorChain.nextStream(applyGuardrail(chatClientRequest));
+        ChatClientResponse response = callAdvisorChain.nextCall(applyGuardrail(chatClientRequest));
+        String content = response.chatResponse().getResult().getOutput().getText();
+        if (content != null && content.stripLeading().startsWith(BLOCK_PREFIX)) {
+            String message = content.stripLeading().substring(BLOCK_PREFIX.length()).strip();
+            throw new GuardrailBlockedException(
+                    message.isBlank() ? "요청을 처리할 수 없습니다." : message);
+        }
+        return response;
     }
 
     @Override

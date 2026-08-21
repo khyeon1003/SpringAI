@@ -42,3 +42,4 @@ out/
 ### RAGAS evaluation ###
 evaluation/.venv/
 evaluation/results/
+evaluation/__pycache__/

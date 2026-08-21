@@ -20,6 +20,32 @@ Spring 챗봇 API에 골든셋 20개를 요청한다. `BLOCK` 10개는 분기 �
 }
 ```
 
+요청 형식은 다음과 같다. 사용자 학사정보를 요청 본문에 직접 보내지 않고 DB에 준비된
+`userId`를 사용한다.
+
+```json
+{
+  "userId": 1,
+  "message": "내 성적으로 조기졸업 성적 기준을 충족하는지 알려줘."
+}
+```
+
+평가용 사용자 ID는 골든셋 케이스 ID별로 환경변수에 지정한다.
+
+```bash
+CHAT_EVAL_USER_IDS='{"answer-006":1,"answer-007":2,"answer-008":3,"answer-009":4}'
+```
+
+응답 형식은 다음과 같다.
+
+```json
+{
+  "action": "ANSWER",
+  "answer": "생성된 답변",
+  "contexts": ["실제로 검색된 문서 조각"]
+}
+```
+
 `contexts` 원소는 문자열이거나 `content`, `text`, `pageContent` 중 하나를 가진 객체여도 된다.
 
 ## 설치 및 실행
