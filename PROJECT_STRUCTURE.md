@@ -248,7 +248,7 @@ erDiagram
 | `OPENAI_API_KEY` | OpenAI API 키 | `sk-...` |
 | `OPENAI_CHAT_MODEL` | 채팅 모델 | `gpt-4.1-mini` |
 | `OPENAI_EMBEDDING_MODEL` | 임베딩 모델 | `text-embedding-3-small` |
-| `RAG_TOP_K` | 질문마다 검색할 유사 문서 개수 | `4` |
+| `RAG_TOP_K` | 질문마다 검색할 유사 문서 개수 | `8` |
 | `RAG_SIMILARITY_THRESHOLD` | 검색 결과로 인정할 코사인 유사도 하한 | `0.54` |
 | `CHAT_MEMORY_MAX_MESSAGES` | 대화 메모리에 유지할 최근 메시지 수 | `20` |
 | `TOKEN_USAGE_AVERAGE_LIMIT` | 질의당 평균 total token 상한 | `2000` |

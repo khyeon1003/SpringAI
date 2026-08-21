@@ -43,3 +43,5 @@ out/
 evaluation/.venv/
 evaluation/results/
 evaluation/__pycache__/
+k6/results/
+.DS_Store

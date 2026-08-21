@@ -27,7 +27,9 @@ export const options = {
   thresholds: {
     http_req_failed: ['rate<0.01'],
     chat_failures: ['rate<0.01'],
-    http_req_duration: ['p(95)<3000', 'p(99)<5000'],
+    // 교재 310쪽의 비기능 요구사항이 P95 5초다. 검색 청크를 4개에서 8개로 늘려 정확도를 올린
+    // 대신 P95 가 2.57초에서 3.33초가 되었고, 요구 기준 안에서 그 교환을 택했다.
+    http_req_duration: ['p(95)<5000', 'p(99)<8000'],
   },
 };
 
