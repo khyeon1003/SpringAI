@@ -90,7 +90,6 @@ Spring AI 기반으로 `vector_store`에서 문서 컨텍스트를 검색하고,
 
 ### 현재 선택한 실행 방식
 
-- `boundedElastic`로 블로킹 파이프라인을 격리하지 않는다.
 - Retriever의 PGVector JDBC 검색과 UserTool의 JPA 조회는 현재 호출 스레드에서 실행된다.
 - 구현은 단순하지만 블로킹 작업이 WebFlux 이벤트 루프를 점유할 수 있다.
 
