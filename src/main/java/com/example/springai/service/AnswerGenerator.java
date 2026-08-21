@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.example.springai.tool.UserDataAccessDeniedException;
 import com.example.springai.tool.UserTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
@@ -18,8 +17,6 @@ public class AnswerGenerator {
 
     private static final Resource SYSTEM_PROMPT = new ClassPathResource("prompts/rag-system.st");
     private static final Resource USER_PROMPT = new ClassPathResource("prompts/rag-user.st");
-    private static final String USER_DATA_ACCESS_FALLBACK = "다른 사용자의 개인 데이터는 조회할 수 없습니다.";
-
     private final ChatClient chatClient;
     private final UserTool userTool;
 
@@ -35,24 +32,15 @@ public class AnswerGenerator {
 
         String context = toContext(documents);
 
-        try {
-            return chatClient.prompt()
-                    .system(SYSTEM_PROMPT)
-                    .user(user -> user.text(USER_PROMPT)
-                            .param("context", context)
-                            .param("query", query))
-                    .tools(userTool)
-                    .toolContext(toToolContext(userId))
-                    .call()
-                    .content();
-        }
-        catch (RuntimeException ex) {
-            if (containsUserDataAccessDeniedException(ex)) {
-                return USER_DATA_ACCESS_FALLBACK;
-            }
-
-            throw ex;
-        }
+        return chatClient.prompt()
+                .system(SYSTEM_PROMPT)
+                .user(user -> user.text(USER_PROMPT)
+                        .param("context", context)
+                        .param("query", query))
+                .tools(userTool)
+                .toolContext(toToolContext(userId))
+                .call()
+                .content();
     }
 
     private Map<String, Object> toToolContext(Long userId) {
@@ -61,20 +49,6 @@ public class AnswerGenerator {
         }
 
         return Map.of(UserTool.USER_ID_CONTEXT_KEY, userId);
-    }
-
-    private boolean containsUserDataAccessDeniedException(Throwable throwable) {
-        Throwable current = throwable;
-
-        while (current != null) {
-            if (current instanceof UserDataAccessDeniedException) {
-                return true;
-            }
-
-            current = current.getCause();
-        }
-
-        return false;
     }
 
     private String toContext(List<Document> documents) {

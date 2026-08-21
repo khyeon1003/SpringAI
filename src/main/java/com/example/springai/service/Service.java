@@ -1,5 +1,12 @@
 package com.example.springai.service;
 
+import java.util.List;
+
+import com.example.springai.advisor.GuardrailBlockedException;
+import com.example.springai.dto.ChatAction;
+import com.example.springai.dto.ChatResponse;
+import org.springframework.ai.document.Document;
+
 @org.springframework.stereotype.Service
 public class Service {
 
@@ -11,9 +18,17 @@ public class Service {
         this.answerGenerator = answerGenerator;
     }
 
-    public String answer(Long userId, String query, Integer topK) {
-        var documents = topK == null ? retriever.retrieve(query) : retriever.retrieve(query, topK);
-
-        return answerGenerator.generate(query, documents, userId);
+    public ChatResponse answer(Long userId, String query) {
+        var documents = retriever.retrieve(query);
+        try {
+            String answer = answerGenerator.generate(query, documents, userId);
+            List<String> contexts = documents.stream()
+                    .map(Document::getText)
+                    .toList();
+            return new ChatResponse(ChatAction.ANSWER, answer, contexts);
+        }
+        catch (GuardrailBlockedException exception) {
+            return new ChatResponse(ChatAction.BLOCK, exception.getMessage(), List.of());
+        }
     }
 }
