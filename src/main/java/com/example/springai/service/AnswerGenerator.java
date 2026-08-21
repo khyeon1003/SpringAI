@@ -25,12 +25,12 @@ public class AnswerGenerator {
         this.userTool = userTool;
     }
 
-    public String generate(String query, List<Document> documents, Long userId) {
+    public String generate(String query, List<Document> retrievedChunks, Long userId) {
         if (!StringUtils.hasText(query)) {
             throw new IllegalArgumentException("query must not be blank");
         }
 
-        String context = toContext(documents);
+        String context = toContext(retrievedChunks);
 
         return chatClient.prompt()
                 .system(SYSTEM_PROMPT)
@@ -51,12 +51,12 @@ public class AnswerGenerator {
         return Map.of(UserTool.USER_ID_CONTEXT_KEY, userId);
     }
 
-    private String toContext(List<Document> documents) {
-        if (documents == null || documents.isEmpty()) {
+    private String toContext(List<Document> retrievedChunks) {
+        if (retrievedChunks == null || retrievedChunks.isEmpty()) {
             return "";
         }
 
-        return documents.stream()
+        return retrievedChunks.stream()
                 .map(Document::getText)
                 .filter(StringUtils::hasText)
                 .collect(Collectors.joining("\n\n---\n\n"));

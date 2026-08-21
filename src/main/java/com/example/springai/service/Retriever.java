@@ -23,7 +23,7 @@ public class Retriever {
         this.topK = topK;
     }
 
-    public List<Document> retrieve(String query) {
+    public List<Document> retrieveChunks(String query) {
         if (!StringUtils.hasText(query)) {
             throw new IllegalArgumentException("query must not be blank");
         }

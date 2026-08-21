@@ -19,10 +19,10 @@ public class Service {
     }
 
     public ChatResponse answer(Long userId, String query) {
-        var documents = retriever.retrieve(query);
+        var retrievedChunks = retriever.retrieveChunks(query);
         try {
-            String answer = answerGenerator.generate(query, documents, userId);
-            List<String> contexts = documents.stream()
+            String answer = answerGenerator.generate(query, retrievedChunks, userId);
+            List<String> contexts = retrievedChunks.stream()
                     .map(Document::getText)
                     .toList();
             return new ChatResponse(ChatAction.ANSWER, answer, contexts);
