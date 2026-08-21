@@ -39,3 +39,7 @@ spring:
         index-type: HNSW
         distance-type: COSINE_DISTANCE
         remove-existing-vector-store-table: false
+
+app:
+  rag:
+    top-k: ${RAG_TOP_K:4}
