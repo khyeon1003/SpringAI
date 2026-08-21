@@ -38,3 +38,7 @@ out/
 
 ### Local environment variables ###
 .env
+
+### RAGAS evaluation ###
+evaluation/.venv/
+evaluation/results/
