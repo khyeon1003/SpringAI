@@ -5,6 +5,7 @@ import java.util.List;
 import com.example.springai.dto.ChatAction;
 import com.example.springai.dto.ChatResponse;
 import org.springframework.ai.document.Document;
+import reactor.core.publisher.Flux;
 
 @org.springframework.stereotype.Service
 public class Service {
@@ -24,5 +25,10 @@ public class Service {
                 .map(Document::getText)
                 .toList();
         return new ChatResponse(ChatAction.ANSWER, answer, contexts);
+    }
+
+    public Flux<String> streamAnswer(Long userId, String query) {
+        var retrievedChunks = retriever.retrieveChunks(query);
+        return answerGenerator.stream(query, retrievedChunks, userId);
     }
 }

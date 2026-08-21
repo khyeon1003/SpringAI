@@ -12,6 +12,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Flux;
 
 @Component
 public class AnswerGenerator {
@@ -50,6 +51,23 @@ public class AnswerGenerator {
         }
         tokenUsageMetrics.record(chatResponse.getMetadata().getUsage());
         return chatResponse.getResult().getOutput().getText();
+    }
+
+    public Flux<String> stream(String query, List<Document> retrievedChunks, Long userId) {
+        if (!StringUtils.hasText(query)) {
+            return Flux.error(new IllegalArgumentException("query must not be blank"));
+        }
+
+        String context = toContext(retrievedChunks);
+        return chatClient.prompt()
+                .system(SYSTEM_PROMPT)
+                .user(user -> user.text(USER_PROMPT)
+                        .param("context", context)
+                        .param("query", query))
+                .tools(userTool)
+                .toolContext(toToolContext(userId))
+                .stream()
+                .content();
     }
 
     private Map<String, Object> toToolContext(Long userId) {

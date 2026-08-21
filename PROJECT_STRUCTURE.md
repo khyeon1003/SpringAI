@@ -174,12 +174,16 @@ erDiagram
 
 ## 7. 현재 RAG 처리 흐름
 
-1. Service가 사용자 질문을 받는다.
+1. Controller가 일반 JSON 응답 또는 SSE 스트림 요청을 받는다.
 2. Retriever가 `RAG_TOP_K` 설정만큼 관련 청크를 Vector Store에서 검색한다.
 3. AnswerGenerator가 검색 청크를 문맥으로 구성한다.
 4. 개인 학사정보가 필요하면 ChatClient가 UserTool을 호출한다.
 5. UserTool은 서버가 전달한 현재 사용자 ID만 조회하도록 코드에서 권한을 검증한다.
 6. 답변 생성이 완료되면 Service가 `action=ANSWER`와 답변 및 검색 context를 반환한다.
+
+SSE 요청은 `POST /api/v1/chat/stream`에서 처리하며 `connected`, `token`, `completed` 이벤트를
+순서대로 반환한다. 현재는 `boundedElastic`을 사용하지 않으므로 JPA/JDBC 블로킹 작업에 따른
+이벤트 루프 지연 가능성을 `history.md`에 기록한다.
 
 현재 최종 답변용 `ChatClient`에는 `GuardrailAdvisor`를 전역 Advisor로 등록하지 않는다.
 따라서 현 단계에서는 `BLOCK` 응답을 생성하지 않으며, Rewrite 노드 구현 전까지 정상 파이프라인 완료 결과는 `ANSWER`이다.
